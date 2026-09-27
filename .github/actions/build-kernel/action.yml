@@ -3246,6 +3246,16 @@ runs:
           exit 1
         fi
 
+        # WILD48: preserve the successful GKI immediately.
+        WILD48_IMAGE="$(find -L bazel-bin/common/kernel_aarch64 -type f -name Image -print -quit)"
+        [ -n "$WILD48_IMAGE" ] || { echo "::error::WILD48 Image missing"; exit 1; }
+
+        mkdir -p "$RUNNER_TEMP/wild48-artifact"
+        cp -L "$WILD48_IMAGE" "$RUNNER_TEMP/wild48-artifact/Image"
+
+        echo "WILD48_IMAGE_PATH=$RUNNER_TEMP/wild48-artifact/Image" >> "$GITHUB_ENV"
+        echo "WILD48 Image preserved: $(stat -c '%s bytes' "$RUNNER_TEMP/wild48-artifact/Image")"
+
         # The vendor kernel's archive is named modules_staging_dir_self.tar.gz:
         # Kleaf declares the "_self" variant for any target with a base_kernel,
         # because _repack_modules_staging_archive later merges the GKI modules
@@ -3260,6 +3270,15 @@ runs:
         echo "BUILD_TIME=$((BUILD_END - BUILD_START))" >> "$GITHUB_ENV"
 
         echo "::endgroup::"
+
+    - name: Upload WILD48 GKI Image
+      if: ${{ env.WILD48_IMAGE_PATH != '' }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: WILD48-GKI-Image
+        path: ${{ env.WILD48_IMAGE_PATH }}
+        if-no-files-found: error
+        retention-days: 7
 
     - name: Upload build.log on failure
       if: ${{ failure() }}
