@@ -1997,32 +1997,30 @@ runs:
         set -euo pipefail
         echo "::group::Enable WILD48 ARM64 VA"
 
-        for CFG in \
-          "$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig" \
-          "$MSM_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig" \
-          "$MSM_KERNEL_FOLDER/arch/arm64/configs/vendor/sun_perf.config"; do
+        CFG="$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig"
 
-          if [ ! -f "$CFG" ]; then
-            echo "::error::WILD48 target config missing: $CFG"
-            exit 1
-          fi
+        if [ ! -f "$CFG" ]; then
+          echo "::error::WILD48 GKI config missing: $CFG"
+          exit 1
+        fi
 
-          sed -i \
-            -e '/^CONFIG_ARM64_VA_BITS_39=/d' \
-            -e '/^# CONFIG_ARM64_VA_BITS_39 is not set$/d' \
-            -e '/^CONFIG_ARM64_VA_BITS_48=/d' \
-            -e '/^# CONFIG_ARM64_VA_BITS_48 is not set$/d' \
-            "$CFG"
+        # The flashable GKI Image is //common:kernel_aarch64.
+        # Change only its defconfig; do not alter vendor/MSM fragments.
+        sed -i \
+          -e '/^CONFIG_ARM64_VA_BITS_39=/d' \
+          -e '/^# CONFIG_ARM64_VA_BITS_39 is not set$/d' \
+          -e '/^CONFIG_ARM64_VA_BITS_48=/d' \
+          -e '/^# CONFIG_ARM64_VA_BITS_48 is not set$/d' \
+          "$CFG"
 
-          cat >> "$CFG" <<'EOF'
-        # WILD48 — 48-bit ARM64 userspace virtual address space
+        cat >> "$CFG" <<'EOF'
+        # WILD48 — 48-bit ARM64 virtual address space
         # CONFIG_ARM64_VA_BITS_39 is not set
         CONFIG_ARM64_VA_BITS_48=y
         EOF
 
-          echo "WILD48 applied: $CFG"
-          tail -n 4 "$CFG"
-        done
+        echo "WILD48 applied only to: $CFG"
+        tail -n 4 "$CFG"
 
         echo "::endgroup::"
 
