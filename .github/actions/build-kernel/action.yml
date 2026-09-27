@@ -1991,6 +1991,41 @@ runs:
         echo "✅ Droidspaces Support applied"
         echo "::endgroup::"
 
+    - name: Enable WILD48 ARM64 virtual address space
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "::group::Enable WILD48 ARM64 VA"
+
+        for CFG in \
+          "$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig" \
+          "$MSM_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig" \
+          "$MSM_KERNEL_FOLDER/arch/arm64/configs/vendor/sun_perf.config"; do
+
+          if [ ! -f "$CFG" ]; then
+            echo "::error::WILD48 target config missing: $CFG"
+            exit 1
+          fi
+
+          sed -i \
+            -e '/^CONFIG_ARM64_VA_BITS_39=/d' \
+            -e '/^# CONFIG_ARM64_VA_BITS_39 is not set$/d' \
+            -e '/^CONFIG_ARM64_VA_BITS_48=/d' \
+            -e '/^# CONFIG_ARM64_VA_BITS_48 is not set$/d' \
+            "$CFG"
+
+          cat >> "$CFG" <<'EOF'
+        # WILD48 — 48-bit ARM64 userspace virtual address space
+        # CONFIG_ARM64_VA_BITS_39 is not set
+        CONFIG_ARM64_VA_BITS_48=y
+        EOF
+
+          echo "WILD48 applied: $CFG"
+          tail -n 4 "$CFG"
+        done
+
+        echo "::endgroup::"
+
     # Performance stack extras (feat/perf-stack). Sources are pinned by
     # commit so rebuilds stay reproducible:
     # - ADIOS I/O scheduler: Hipuu/build_oneplus_sm8750 @ 805b38e4
@@ -3488,6 +3523,12 @@ runs:
         # and kconfig discards the line before the merge even runs.
         assert_config "CONFIG_DEFAULT_FQ=y"
         assert_config "CONFIG_SCHED_CLUSTER=y"
+
+        # WILD48: verify Kconfig resolved a genuine 4K/48-bit ARM64 layout.
+        assert_config "CONFIG_ARM64_4K_PAGES=y"
+        assert_config "CONFIG_ARM64_VA_BITS_48=y"
+        assert_config "CONFIG_ARM64_VA_BITS=48"
+        assert_config "CONFIG_PGTABLE_LEVELS=4"
         # Battery opt-ins: same vendor-fragment-drop risk as above, plus the
         # resolved CMDLINE must carry the opted-in tokens (the appended line
         # is the whole string value, last-assignment-wins).
