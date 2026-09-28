@@ -1997,30 +1997,43 @@ runs:
         set -euo pipefail
         echo "::group::Enable WILD48 ARM64 VA"
 
-        CFG="$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig"
+        # WILD48 must be consistent across both halves of the SM8750
+        # mixed build: common provides the boot kernel while msm-kernel
+        # builds sun_perf device modules against its own gki_defconfig.
+        CFG_COMMON="$COMMON_KERNEL_FOLDER/arch/arm64/configs/gki_defconfig"
+        CFG_MSM="$KERNEL_PLATFORM_FOLDER/msm-kernel/arch/arm64/configs/gki_defconfig"
 
-        if [ ! -f "$CFG" ]; then
-          echo "::error::WILD48 GKI config missing: $CFG"
-          exit 1
-        fi
+        for CFG48 in "$CFG_COMMON" "$CFG_MSM"; do
+          [ -f "$CFG48" ] || {
+            echo "::error::WILD48 defconfig missing: $CFG48"
+            exit 1
+          }
 
-        # The flashable GKI Image is //common:kernel_aarch64.
-        # Change only its defconfig; do not alter vendor/MSM fragments.
-        sed -i \
-          -e '/^CONFIG_ARM64_VA_BITS_39=/d' \
-          -e '/^# CONFIG_ARM64_VA_BITS_39 is not set$/d' \
-          -e '/^CONFIG_ARM64_VA_BITS_48=/d' \
-          -e '/^# CONFIG_ARM64_VA_BITS_48 is not set$/d' \
-          "$CFG"
+          sed -i \
+            -e '/^CONFIG_ARM64_4K_PAGES=/d' \
+            -e '/^# CONFIG_ARM64_4K_PAGES is not set$/d' \
+            -e '/^CONFIG_ARM64_16K_PAGES=/d' \
+            -e '/^# CONFIG_ARM64_16K_PAGES is not set$/d' \
+            -e '/^CONFIG_ARM64_64K_PAGES=/d' \
+            -e '/^# CONFIG_ARM64_64K_PAGES is not set$/d' \
+            -e '/^CONFIG_ARM64_VA_BITS_39=/d' \
+            -e '/^# CONFIG_ARM64_VA_BITS_39 is not set$/d' \
+            -e '/^CONFIG_ARM64_VA_BITS_48=/d' \
+            -e '/^# CONFIG_ARM64_VA_BITS_48 is not set$/d' \
+            "$CFG48"
 
-        cat >> "$CFG" <<'EOF'
-        # WILD48 — 48-bit ARM64 virtual address space
+          cat >> "$CFG48" <<'EOF'
+        # WILD48 — identical ARM64 MM geometry across GKI + device side
+        CONFIG_ARM64_4K_PAGES=y
+        # CONFIG_ARM64_16K_PAGES is not set
+        # CONFIG_ARM64_64K_PAGES is not set
         # CONFIG_ARM64_VA_BITS_39 is not set
         CONFIG_ARM64_VA_BITS_48=y
         EOF
 
-        echo "WILD48 applied only to: $CFG"
-        tail -n 4 "$CFG"
+          echo "WILD48 applied to: $CFG48"
+          tail -n 4 "$CFG48"
+        done
 
         echo "::endgroup::"
 
